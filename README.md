@@ -200,35 +200,6 @@ Extensive logging with correlation IDs ensures every request is traceable.
 
 ---
 
-## Testing Strategy
-
-### **Test Coverage**
-- Unit tests for DecisionEngineService
-- Test infrastructure for service layer
-- Mock-based testing for external dependencies
-
----
-
-## Security Considerations
-
-1. **PII Handling**: Customer data (PII) is handled securely
-2. **Audit Trail**: All decisions are logged with correlation IDs
-3. **Sanctions Compliance**: Immediate blocking of sanctioned individuals
-4. **Data Validation**: Input validation at DTO level
-
----
-
-## Future Enhancements (Not Yet Implemented)
-
-1. REST API controllers for external access
-2. Database persistence for verification results
-3. Asynchronous processing for high-volume scenarios
-4. Webhook notifications for decision updates
-5. Admin dashboard for manual review queue
-6. Advanced analytics and reporting
-7. Circuit breaker pattern for additional resilience
-
----
 
 ## Project Structure
 
