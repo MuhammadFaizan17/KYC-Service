@@ -1,0 +1,350 @@
+# Overview
+
+**Duration**: 60 minutes
+
+**Approach**: Test-Driven Development (TDD) - Preferred
+
+**Language**: Java/Kotlin
+
+**Structure**: This exercise has **3 progressive milestones**. Complete them in order:
+- **Milestone 1**: Core functionality (40-45 minutes) - Average candidates should complete this
+- **Milestone 2**: Production-ready essentials (15-20 minutes) - Good candidates complete M1 + M2 partially
+- **Milestone 3**: Advanced features (only if time permits) - Expert candidates may start this
+
+**Realistic Expectation**: In 60 minutes, most candidates will complete Milestone 1 + partial Milestone 2. That’s success!
+
+---
+
+## Background
+
+eKYC is the digital process of verifying a customer’s identity remotely. Financial institutions use eKYC to onboard customers while complying with regulatory requirements.
+
+You will build an **eKYC Verification Service** that orchestrates verification requests across multiple external microservices.
+
+### Microservices Architecture
+
+Your service communicates with 4 external microservices:
+
+1. **Document Verification Service** - `/api/v1/verify-document`
+2. **Biometric Service** - `/api/v1/face-match`
+3. **Address Verification Service** - `/api/v1/verify-address`
+4. **Sanctions Screening Service** - `/api/v1/check-sanctions`
+
+**Important Constraints**:
+- Each service has a rate limit of **10 requests per minute**
+- Services may timeout or fail (must handle gracefully)
+- Services may return partial failures requiring manual review
+
+---
+
+## Data Models
+
+### Customer
+
+```python
+{
+  "customer_id": "CUST-001",
+  "full_name": "Jane Doe",
+  "date_of_birth": "1990-05-15",
+  "email": "jane.doe@example.com",
+  "phone": "+1-555-0123",
+  "address": "123 Main St, Springfield, IL 62701"
+}
+```
+
+### Verification Request
+
+```python
+{
+  "request_id": "REQ-12345",
+  "customer_id": "CUST-001",
+  "verification_types": ["ID_DOCUMENT", "FACE_MATCH", "ADDRESS", "SANCTIONS"],
+  "timestamp": "2026-01-08T10:30:00Z"
+}
+```
+
+### Verification Result
+
+```python
+{
+  "verification_type": "ID_DOCUMENT",
+  "status": "PASS" | "FAIL" | "MANUAL_REVIEW",
+  "confidence": 95,  # 0-100
+  "reasons": [],  # List of failure reasons if any
+  "timestamp": "2026-01-08T10:30:05Z"
+}
+```
+
+### KYC Decision
+
+```python
+{
+  "decision": "APPROVED" | "REJECTED" | "MANUAL_REVIEW",
+  "verification_results": [...],  # All verification results
+  "timestamp": "2026-01-08T10:30:10Z"
+}
+```
+
+---
+
+## External Service APIs
+
+### 1. Document Verification Service
+
+**Endpoint**: `POST /api/v1/verify-document`
+
+**Timeout**: 5 seconds
+
+**Rate Limit**: 10 req/min
+
+**Request**:
+
+```json
+{
+  "customer_id": "CUST-001",
+  "document_type": "PASSPORT",
+  "document_number": "P12345678",
+  "expiry_date": "2027-12-31",
+  "document_image_url": "https://..."
+}
+```
+
+**Response**:
+
+```json
+{
+  "status": "PASS",
+  "confidence": 95,
+  "reasons": []
+}
+```
+
+### 2. Biometric Service
+
+**Endpoint**: `POST /api/v1/face-match`
+
+**Timeout**: 8 seconds
+
+**Rate Limit**: 10 req/min
+
+**Request**:
+
+```json
+{
+  "customer_id": "CUST-001",
+  "selfie_url": "https://...",
+  "id_photo_url": "https://..."
+}
+```
+
+**Response**:
+
+```json
+{
+  "status": "PASS",
+  "confidence": 92,
+  "similarity_score": 92.5
+}
+```
+
+### 3. Address Verification Service
+
+**Endpoint**: `POST /api/v1/verify-address`
+
+**Timeout**: 5 seconds
+
+**Rate Limit**: 10 req/min
+
+**Request**:
+
+```json
+{
+  "customer_id": "CUST-001",
+  "address": "123 Main St, Springfield, IL 62701",
+  "proof_type": "UTILITY_BILL",
+  "proof_date": "2025-12-15",
+  "proof_url": "https://..."
+}
+```
+
+**Response**:
+
+```json
+{
+  "status": "PASS",
+  "confidence": 88,
+  "reasons": []
+}
+```
+
+### 4. Sanctions Screening Service (CRITICAL)
+
+**Endpoint**: `POST /api/v1/check-sanctions`
+
+**Timeout**: 3 seconds
+
+**Rate Limit**: 10 req/min
+
+**Request**:
+
+```json
+{
+  "customer_id": "CUST-001",
+  "full_name": "Jane Doe",
+  "date_of_birth": "1990-05-15",
+  "nationality": "US"
+}
+```
+
+**Response**:
+
+```json
+{
+  "status": "CLEAR" | "HIT",
+  "match_count": 0,
+  "matches": []
+}
+
+
+## Business Rules
+
+1. **Document Verification**:
+    - Document must not be expired
+    - Confidence score > 85% for PASS
+    - Expired or low confidence → REJECTED or MANUAL_REVIEW
+2. **Face Match**:
+    - Confidence score > 85% for PASS
+    - Similarity score > 85% for PASS
+    - Low scores → MANUAL_REVIEW
+3. **Address Verification**:
+    - Proof must be dated within last 90 days
+    - Confidence score > 80% for PASS
+4. **Sanctions Check**:
+    - ANY match → REJECTED immediately
+    - MUST succeed (cannot proceed if service fails)
+5. **Final Decision Logic**:
+    - **APPROVED**: All checks PASS
+    - **REJECTED**: Sanctions hit OR expired document OR critical failures
+    - **MANUAL_REVIEW**: Low confidence scores OR partial failures
+
+---
+
+# MILESTONE 1: Core Functionality (40-45 minutes)
+
+**Target**: Average candidates should complete this milestone
+
+**Realistic Time Breakdown**:
+- Data models: 5-10 min
+- Decision engine with TDD: 20-25 min (tests first!)
+- HTTP client + mocks: 10-15 min
+- Service clients: 15-20 min
+- Orchestrator: 10-15 min
+- Happy path test: 5 min
+
+## Goal
+
+Build a working verification orchestrator that can call services and make basic KYC decisions.
+
+## Requirements
+
+### 1.1 Data Models
+
+Define classes/structures for:
+- ✅ Customer
+- ✅ VerificationRequest
+- ✅ VerificationResult
+- ✅ KYCDecision enums
+
+### 1.2 HTTP Client for Services
+
+Create an HTTP client that can:
+- ✅ Make POST requests to external services
+- ✅ Set timeout (5 seconds default)
+- ✅ Parse JSON responses
+- ✅ Handle basic errors (timeout, 500 errors)
+
+**Mock the services** - Don’t make real HTTP calls, use mocks or stubs.
+
+### 1.3 Service Clients
+
+Implement clients for all 4 services:
+- ✅ DocumentVerificationClient
+- ✅ BiometricVerificationClient
+- ✅ AddressVerificationClient
+- ✅ SanctionsScreeningClient
+
+Each client should:
+- Call the appropriate endpoint
+- Return a VerificationResult
+
+### 1.4 Decision Engine
+
+Implement logic to make final KYC decision:
+- ✅ Input: List of VerificationResults
+- ✅ Output: KYCDecision (APPROVED/REJECTED/MANUAL_REVIEW)
+- ✅ Apply business rules from section above
+
+### 1.5 Orchestrator
+
+Create main orchestration class:
+- ✅ Input: Customer + list of verification types to perform
+- ✅ Call appropriate service clients
+- ✅ Aggregate results
+- ✅ Call decision engine
+- ✅ Return final decision
+
+### 1.6 Basic Testing
+
+- ✅ Write unit tests for decision engine (different scenarios)
+- ✅ Write tests for happy path end-to-end flow
+- ✅ Tests should use mocked service clients
+
+## Success Criteria for Milestone 1
+
+- [ ]  All data models defined
+- [ ]  HTTP client can make requests (mocked)
+- [ ]  All 4 service clients implemented
+- [ ]  Decision engine applies business rules correctly
+- [ ]  Orchestrator works end-to-end
+- [ ]  Basic tests pass (happy path + decision logic)
+- [ ]  Code runs without errors
+
+## Test Cases for Milestone 1
+
+- test_all_verifications_pass
+    - # All services return PASS with high confidence
+        # Expected: APPROVED
+- test_sanctions_hit
+    - # Sanctions service returns HIT
+        # Expected: REJECTED
+- test_low_confidence_scores
+    - Face match returns confidence 70%
+        # Expected: MANUAL_REVIEW
+- test_expired_document
+    - # Document verification returns expired
+        # Expected: REJECTED
+
+---
+
+# MILESTONE 2: Production-Ready Essentials (15-20 minutes)
+
+**Target**: Good candidates complete Milestone 1 + start Milestone 2
+
+**Realistic Time Breakdown**:
+- Structured logging + correlation IDs: 5-10 min
+- Retry logic with exponential backoff: 10-15 min
+- Basic error handling: 5-10 min
+- Configuration (optional if time): 5-10 min
+- Input validation (optional if time): 5-10 min
+
+## Goal
+
+Add essential production-ready features: logging, retry logic, and error handling.
+
+**Note**: This milestone is intentionally scoped smaller. Focus on the **must-haves** first.
+
+## Requirements
+
+### 2.1 Logging & Observability (MUST HAVE - 5-10 min)
+
+- ✅ Use structured logging framework (not print statements)
